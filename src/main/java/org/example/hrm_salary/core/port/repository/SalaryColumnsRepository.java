@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 public interface SalaryColumnsRepository extends JpaRepository<SalaryColumnsEntity, Long>, JpaSpecificationExecutor<SalaryColumnsEntity> {
@@ -21,5 +22,5 @@ public interface SalaryColumnsRepository extends JpaRepository<SalaryColumnsEnti
     Page<SalaryColumnsEntity> findAllByGroupSalaryColumnsId(Long id, Pageable pageable);
 
     List<SalaryColumnsEntity> findAllByIdIn(Collection<Long> columnIds);
-
+//    Map<Long, List<SalaryColumnsEntity>> findSalaryColumnsEntitiesB
 }

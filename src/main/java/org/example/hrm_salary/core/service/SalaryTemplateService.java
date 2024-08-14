@@ -50,8 +50,8 @@ public class SalaryTemplateService implements SalaryTemplateApi {
     private final ServiceProxy serviceProxyImpl;
 
     @Override
-    public Page<SalaryTemplateResponse> getSalaryTemplatePage(Long id, String search, String name,Pageable pageable) {
-        Page<SalaryTemplatesEntity> salaryTemplatesEntities = getSalaryTemplateEntitySearch(id,search,name,pageable);
+    public Page<SalaryTemplateResponse> getSalaryTemplatePage(Long id, String search, String name, Pageable pageable) {
+        Page<SalaryTemplatesEntity> salaryTemplatesEntities = getSalaryTemplateEntitySearch(id, search, name, pageable);
         if (salaryTemplatesEntities.isEmpty()) throw new RuntimeException(ErrorCode.LIST_IS_EMPTY);
         List<Long> templateIds = salaryTemplatesEntities.stream().map(SalaryTemplatesEntity::getId)
                 .collect(Collectors.toList());
@@ -72,18 +72,15 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
     }
+
     @Override
     public SalaryTemplateDetailResponse getSalaryTemplateById(Long templateId) {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
         SalaryTemplateDetailResponse salaryTemplateResponse = salaryTemplateMapper
                 .getResponseDetailFromEntity(salaryTemplatesEntity);
-        List<SalaryTemplateApplicablesEntity> salaryTemplateApplicablesEntity = salaryTemplateApplicableRepository
-                .findAllBySalaryTemplatesId(templateId);
-        if (salaryTemplateApplicablesEntity.isEmpty()) throw new RuntimeException(ErrorCode.LIST_IS_EMPTY);
         List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
                 salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesId(templateId);
-        if (salaryTemplatesSalaryColumnsEntities.isEmpty()) throw new RuntimeException(ErrorCode.LIST_IS_EMPTY);
-        return getSalaryTemplateInformationById(templateId, salaryTemplatesSalaryColumnsEntities, salaryTemplateResponse);
+        return getSalaryTemplate(templateId, salaryTemplatesSalaryColumnsEntities, salaryTemplateResponse);
     }
 
     @Override
@@ -93,7 +90,8 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         SalaryTemplatesEntity salaryTemplatesEntity = salaryTemplateMapper.getEntityFromRequest(salaryTemplateRequest);
         salaryTemplateRepository.save(salaryTemplatesEntity);
         // create salary
-        createMapperDataSalaryTemplate(salaryTemplateRequest, salaryTemplatesEntity);
+        createTemplateLines(salaryTemplateRequest,salaryTemplatesEntity);
+        createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
         return IdResponse.builder()
                 .id(salaryTemplatesEntity.getId())
                 .build();
@@ -113,38 +111,38 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(salaryTemplateId);
         salaryTemplateMapper.updateSalaryTemplate(salaryTemplatesEntity, salaryTemplateRequest);
         salaryTemplateRepository.save(salaryTemplatesEntity);
-        createMapperDataSalaryTemplate(salaryTemplateRequest, salaryTemplatesEntity);
+        createTemplateLines(salaryTemplateRequest,salaryTemplatesEntity);
+        createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
+
         return IdResponse.builder()
                 .id(salaryTemplatesEntity.getId())
                 .build();
     }
 
-    private void createMapperDataSalaryTemplate(SalaryTemplateRequest salaryTemplateRequest,
-                                                SalaryTemplatesEntity salaryTemplatesEntity) {
+    private void createTemplateLines(SalaryTemplateRequest salaryTemplateRequest,
+                                     SalaryTemplatesEntity salaryTemplatesEntity){
         salaryTemplateApplicableRepository.deleteAllBySalaryTemplatesId(salaryTemplatesEntity.getId());
         salaryTemplatesSalaryColumnsRepository.deleteAllBySalaryTemplatesId(salaryTemplatesEntity.getId());
-
         if (Objects.isNull(salaryTemplateRequest.getTemplatesLineItems())) {
             return;
         }
         salaryTemplateRequest.getTemplatesLineItems().forEach(templatesLineRequest -> {
-            // check column null
+            if (Objects.isNull(templatesLineRequest.getSalaryColumn()) && Objects.isNull(templatesLineRequest.getGroupSalary()))
+                throw new RuntimeException(ErrorCode.IS_NULL);
+            if (Objects.nonNull(templatesLineRequest.getSalaryColumn()) && Objects.nonNull(templatesLineRequest.getGroupSalary()))
+                throw new RuntimeException(ErrorCode.IS_NULL);
+            // check column null-group not null
             if (Objects.isNull(templatesLineRequest.getSalaryColumn())) {
-                if (Objects.isNull(templatesLineRequest.getGroupSalary()))
+                List<SalaryColumnBasicRequest> groupSalaryItems = templatesLineRequest.getGroupSalaryItems();
+                // check groupLineItems null
+                if (Objects.isNull(groupSalaryItems) || groupSalaryItems.isEmpty())
                     throw new RuntimeException(ErrorCode.IS_NULL);
-                List<SalaryColumnBasicRequest> salaryColumnBasicRequestList = templatesLineRequest.getGroupSalaryItems();
-                if (Objects.isNull(salaryColumnBasicRequestList) || salaryColumnBasicRequestList.isEmpty())
-                    throw new RuntimeException(ErrorCode.IS_NULL);
-                salaryColumnBasicRequestList.forEach(
-                        salaryColumnBasicRequest -> {
-                            salaryTemplatesSalaryColumnsRepository.save(
-                                    SalaryTemplatesSalaryColumnsEntity.builder()
-                                            .salaryTemplatesId(salaryTemplatesEntity.getId())
-                                            .groupSalaryColumnsId(templatesLineRequest.getGroupSalary().getId())
-                                            .salaryColumnsId(salaryColumnBasicRequest.getId())
-                                            .build()
-                            );
-                        }
+                groupSalaryItems.forEach(salaryColumnBasicRequest ->
+                        salaryTemplatesSalaryColumnsRepository.save(SalaryTemplatesSalaryColumnsEntity.builder()
+                                .salaryTemplatesId(salaryTemplatesEntity.getId())
+                                .groupSalaryColumnsId(templatesLineRequest.getGroupSalary().getId())
+                                .salaryColumnsId(salaryColumnBasicRequest.getId())
+                                .build())
                 );
             } else {
                 salaryTemplatesSalaryColumnsRepository.save(
@@ -155,10 +153,13 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 );
             }
         });
+    }
+
+    private void createTeamPlateApplicableType(SalaryTemplateRequest salaryTemplateRequest,
+                                               SalaryTemplatesEntity salaryTemplatesEntity) {
         // create salaryTemplateApplicable map
         if (salaryTemplateRequest.getApplicableType().equals(ApplicablesType.DEPARTMENT)) {
-            if (Objects.isNull(salaryTemplateRequest.getDepartment()))
-                throw new RuntimeException(ErrorCode.IS_NULL);
+            if (Objects.isNull(salaryTemplateRequest.getDepartment())) throw new RuntimeException(ErrorCode.IS_NULL);
             List<Long> departmentIds = salaryTemplateRequest.getDepartment().stream()
                     .map(IdAndName::getId).collect(Collectors.toList());
             for (Long departmentId : departmentIds) {
@@ -168,8 +169,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                         .build());
             }
         } else if (salaryTemplateRequest.getApplicableType().equals(ApplicablesType.EMPLOYEE)) {
-            if (Objects.isNull(salaryTemplateRequest.getEmployee()))
-                throw new RuntimeException(ErrorCode.IS_NULL);
+            if (Objects.isNull(salaryTemplateRequest.getEmployee())) throw new RuntimeException(ErrorCode.IS_NULL);
             List<Long> employeeIds = salaryTemplateRequest.getEmployee().stream()
                     .map(IdAndName::getId).collect(Collectors.toList());
             for (Long employeeId : employeeIds) {
@@ -181,42 +181,38 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         }
     }
 
-    private Map<Long, List<DataEmployeeResponse>> salaryIdEmployeeInformationFromResource(
-            Long templateId) {
-
+    private Map<Long, List<DataEmployeeResponse>> getEmployeeFromResourceMap(Long templateId) {
         List<Long> employeeIds = salaryTemplateApplicableRepository.findAllBySalaryTemplatesId(templateId).stream()
                 .map(SalaryTemplateApplicablesEntity::getStaffId).collect(Collectors.toList());
-        Map<Long, DataEmployeeResponse> idEmployeeResponseMap = serviceProxyImpl.getEmployeesByListIds(employeeIds)
-                .getData().stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(DataEmployeeResponse::getId, Function.identity()));
+        Map<Long, DataEmployeeResponse> employeeResponseMap = serviceProxyImpl.getEmployeesByListIdsMap(employeeIds);
+        // Map salaryId - [employee]
         return salaryTemplateApplicableRepository.findAllBySalaryTemplatesId(templateId).stream()
                 .collect(Collectors.groupingBy(
                         SalaryTemplateApplicablesEntity::getSalaryTemplatesId,
                         Collectors.mapping(
-                                salaryTemplateApplicablesEntity -> idEmployeeResponseMap
+                                salaryTemplateApplicablesEntity -> employeeResponseMap
                                         .get(salaryTemplateApplicablesEntity.getStaffId()), Collectors.toList()
                         )
                 ));
     }
+
     Page<SalaryTemplatesEntity> getSalaryTemplateEntitySearch(
             Long id,
             String search,
             String name,
-            Pageable pageable){
+            Pageable pageable) {
         Specification<SalaryTemplatesEntity> conditions = Specification.where(SpecificationSalaryTemplate.filterById(id));
         conditions = conditions.and(SpecificationSalaryTemplate.filterNameOrCode(search));
         conditions = conditions.and(SpecificationSalaryTemplate.filterName(name));
 
         return salaryTemplateRepository.findAll(conditions, pageable);
     }
-    private SalaryTemplateDetailResponse getSalaryTemplateInformationById(Long templateId
+
+    private SalaryTemplateDetailResponse getSalaryTemplate(Long templateId
             , List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities
             , SalaryTemplateDetailResponse salaryTemplateResponse) {
-        Map<Long, List<DataDepartmentResponse>> salaryIdDepartmentInformationFromResource =
-                salaryIdDepartmentInformationFromResource(templateId);
-        Map<Long, List<DataEmployeeResponse>> salaryIdEmployeeInformationFromResource =
-                salaryIdEmployeeInformationFromResource(templateId);
+        Map<Long, List<DataDepartmentResponse>> departmentFromResourceMap = getDepartmentFromResourceMap(templateId);
+        Map<Long, List<DataEmployeeResponse>> employeeFromResourceMap = getEmployeeFromResourceMap(templateId);
         Set<Long> columnIds = new HashSet<>();
         Set<Long> groupIds = new HashSet<>();
         Set<Long> columnItemIds = new HashSet<>();
@@ -231,14 +227,12 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                     }
                 }
         );
-        Map<Long, List<SalaryColumnBasicResponse>> groupIdSalaryColumnBasicMap =
+        Map<Long, List<SalaryColumnBasicResponse>> salaryColumnBasicMap =
                 groupIdSalaryColumnBasicMap(salaryTemplatesSalaryColumnsEntities, columnItemIds);
-
-        Map<Long, SalaryColumnBasicResponse> longSalaryColumnsEntityMap = salaryColumnsRepository
-                .findAllByIdIn(columnIds)
+        Map<Long, SalaryColumnBasicResponse> salaryColumnsBasicMap = salaryColumnsRepository.findAllByIdIn(columnIds)
                 .stream().collect(Collectors.toMap(SalaryColumnsEntity::getId, salaryColumnsEntity ->
                         salaryColumnsMapper.getSalaryColumnBasicResponseFromEntity(salaryColumnsEntity)));
-        Map<Long, GroupSalaryTemplateResponse> groupSalaryColumnsEntityMap = groupSalaryColumnRepository
+        Map<Long, GroupSalaryTemplateResponse> salaryGroupTemplateMap = groupSalaryColumnRepository
                 .findAllByIdIn(groupIds)
                 .stream().collect(Collectors.toMap(GroupSalaryColumnsEntity::getId, groupSalaryColumnsEntity ->
                         groupSalaryColumnMapper.getGroupTemplateResponse(groupSalaryColumnsEntity)));
@@ -247,17 +241,17 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 salaryTemplatesSalaryColumnsEntity -> {
                     if (Objects.isNull(salaryTemplatesSalaryColumnsEntity.getGroupSalaryColumnsId())) {
                         TemplateSalaryItems templateSalaryItem = TemplateSalaryItems.builder()
-                                .salaryColumn(longSalaryColumnsEntityMap
+                                .salaryColumn(salaryColumnsBasicMap
                                         .get(salaryTemplatesSalaryColumnsEntity.getSalaryColumnsId()))
                                 .build();
                         templateSalaryItems.add(templateSalaryItem);
                     } else {
                         if (!checkGroupExits.contains(salaryTemplatesSalaryColumnsEntity.getGroupSalaryColumnsId())) {
                             TemplateSalaryItems templateSalaryItem = TemplateSalaryItems.builder()
-                                    .groupSalaryItems(groupIdSalaryColumnBasicMap.get(
+                                    .groupSalaryItems(salaryColumnBasicMap.get(
                                             salaryTemplatesSalaryColumnsEntity.getGroupSalaryColumnsId()
                                     ))
-                                    .groupSalaryColumn(groupSalaryColumnsEntityMap.get(
+                                    .groupSalaryColumn(salaryGroupTemplateMap.get(
                                             salaryTemplatesSalaryColumnsEntity.getGroupSalaryColumnsId()
                                     ))
                                     .build();
@@ -268,21 +262,20 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
         salaryTemplateResponse.setSalaryTemplateItems(templateSalaryItems);
-        salaryTemplateResponse.setDepartment(salaryIdDepartmentInformationFromResource.get(templateId));
-        salaryTemplateResponse.setEmployee(salaryIdEmployeeInformationFromResource.get(templateId));
+        salaryTemplateResponse.setDepartment(departmentFromResourceMap.get(templateId));
+        salaryTemplateResponse.setEmployee(employeeFromResourceMap.get(templateId));
         return salaryTemplateResponse;
     }
 
     private Map<Long, List<SalaryColumnBasicResponse>> groupIdSalaryColumnBasicMap(
             List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities,
             Set<Long> columnIds) {
-        Map<Long, SalaryColumnBasicResponse> salaryColumnBasicResponseMap = salaryColumnsRepository.findAllByIdIn(columnIds)
-                .stream()
-                .collect(Collectors.toMap(
-                        SalaryColumnsEntity::getId,
-                        salaryColumnsEntity -> salaryColumnsMapper.getSalaryColumnBasicResponseFromEntity(salaryColumnsEntity)
-                ));
-
+        List<Long> columnIdList = new ArrayList<>(columnIds);
+        Map<Long, SalaryColumnsEntity> salaryColumnEntityMap = customRepository.getSalaryColumnsEntityMap(columnIdList);
+        Map<Long, SalaryColumnBasicResponse> salaryColumnBasicResponseMap = new HashMap<>();
+        salaryColumnEntityMap.forEach((id, salaryColumnsEntity)
+                -> salaryColumnBasicResponseMap
+                .put(id, salaryColumnsMapper.getSalaryColumnBasicResponseFromEntity(salaryColumnsEntity)));
         return salaryTemplatesSalaryColumnsEntities.stream()
                 .filter(salaryTemplatesSalaryColumnsEntity ->
                         Objects.nonNull(salaryTemplatesSalaryColumnsEntity.getGroupSalaryColumnsId()))
@@ -297,20 +290,16 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 ));
     }
 
-    private Map<Long, List<DataDepartmentResponse>> salaryIdDepartmentInformationFromResource(
+    private Map<Long, List<DataDepartmentResponse>> getDepartmentFromResourceMap(
             Long salaryTemplateId) {
         List<Long> departmentIds = salaryTemplateApplicableRepository.findAllBySalaryTemplatesId(salaryTemplateId)
                 .stream().map(SalaryTemplateApplicablesEntity::getDepartmentId).collect(Collectors.toList());
-        Map<Long, DataDepartmentResponse> idDepartmentResponseMap = serviceProxyImpl
-                .getDepartmentsByListIds(departmentIds).getContent()
-                .stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(DataDepartmentResponse::getId, Function.identity()));
+        Map<Long, DataDepartmentResponse> departmentResponseMap = serviceProxyImpl.getDepartmentsByListIdsMap(departmentIds);
         return salaryTemplateApplicableRepository.findAllBySalaryTemplatesId(salaryTemplateId).stream()
                 .collect(Collectors.groupingBy(
                         SalaryTemplateApplicablesEntity::getSalaryTemplatesId,
                         Collectors.mapping(
-                                salaryTemplateApplicablesEntity -> idDepartmentResponseMap
+                                salaryTemplateApplicablesEntity -> departmentResponseMap
                                         .get(salaryTemplateApplicablesEntity.getDepartmentId()), Collectors.toList()
                         )
                 ));

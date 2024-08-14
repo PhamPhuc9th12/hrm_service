@@ -5,9 +5,11 @@ import org.example.hrm_salary.core.domain.constant.ErrorCode;
 import org.example.hrm_salary.core.domain.entity.GroupSalaryColumnsEntity;
 import org.example.hrm_salary.core.domain.entity.SalaryColumnsEntity;
 import org.example.hrm_salary.core.domain.entity.SalaryTemplatesEntity;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Repository;
+
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Repository
 @AllArgsConstructor
@@ -32,5 +34,21 @@ public class CustomRepository {
         return salaryTemplateRepository.findById(id).orElseThrow(
                 () -> new RuntimeException(ErrorCode.NOT_FOUND)
         );
+    }
+    public Map<Long, GroupSalaryColumnsEntity> getGroupSalaryColumnsEntityMap(List<Long> ids){
+        if(Objects.isNull(ids) || ids.isEmpty()){
+            return new HashMap<>();
+        }
+        return groupSalaryColumnRepository.findAllByIdIn(ids).stream().collect(Collectors.toMap(
+                GroupSalaryColumnsEntity::getId, Function.identity()
+        ));
+    }
+    public Map<Long, SalaryColumnsEntity> getSalaryColumnsEntityMap(List<Long> ids){
+        if(Objects.isNull(ids) || ids.isEmpty()){
+            return new HashMap<>();
+        }
+        return salaryColumnsRepository.findAllByIdIn(ids).stream().collect(Collectors.toMap(
+                SalaryColumnsEntity::getId, Function.identity()
+        ));
     }
 }
