@@ -4,11 +4,12 @@ import org.example.hrm_salary.core.domain.common.Utils;
 import org.example.hrm_salary.core.domain.entity.SalaryColumnsEntity;
 import org.example.hrm_salary.core.domain.entity.SalaryTemplatesEntity;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Component;
 
 import javax.persistence.criteria.*;
 import java.util.Collection;
 import java.util.Objects;
-
+@Component
 public class SpecificationSalaryTemplate implements Specification<SalaryTemplatesEntity> {
     private SpecificationSalaryTemplate() {
     }

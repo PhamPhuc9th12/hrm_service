@@ -23,8 +23,8 @@ public class GroupSalaryColumnController implements GroupSalaryColumnsApi {
     }
 
     @Override
-    public Page<GroupSalaryColumnResponse> getListGroupSalaryResponse(String name, String code, Pageable pageable) {
-        return groupSalaryColumnService.getListGroupSalaryResponse(name,code,pageable);
+    public Page<GroupSalaryColumnResponse> getListGroupSalaryResponse(Long id, String search, String name, Pageable pageable) {
+        return groupSalaryColumnService.getListGroupSalaryResponse(id,search,name,pageable);
     }
 
     @Override

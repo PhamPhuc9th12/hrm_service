@@ -22,5 +22,4 @@ public interface SalaryColumnsRepository extends JpaRepository<SalaryColumnsEnti
 
     List<SalaryColumnsEntity> findAllByIdIn(Collection<Long> columnIds);
 
-    Page<SalaryColumnsEntity> findAll(Specification<SalaryColumnsEntity> conditions, Pageable pageable);
 }

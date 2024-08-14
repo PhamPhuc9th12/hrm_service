@@ -8,6 +8,8 @@ import org.example.hrm_salary.app.dto.response.GroupSalaryColumnResponse.GroupSa
 import org.example.hrm_salary.core.domain.common.SearchCriteria;
 import org.example.hrm_salary.core.domain.constant.ErrorCode;
 import org.example.hrm_salary.core.domain.entity.GroupSalaryColumnsEntity;
+import org.example.hrm_salary.core.domain.entity.SalaryColumnsEntity;
+import org.example.hrm_salary.core.domain.specification.SpecificationSalaryColumn;
 import org.example.hrm_salary.core.port.mapper.GroupSalaryColumnMapper;
 import org.example.hrm_salary.core.port.repository.GroupSalaryColumnRepository;
 import org.example.hrm_salary.core.domain.specification.GroupSalaryColumnSpecification;
@@ -41,23 +43,9 @@ public class GroupSalaryColumnService implements GroupSalaryColumnsApi {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<GroupSalaryColumnResponse> getListGroupSalaryResponse(String name, String code, Pageable pageable) {
-        Page<GroupSalaryColumnResponse> groupSalaryColumnResponsePage = null;
-        GroupSalaryColumnSpecification nameSearch = (name != null && !name.isEmpty()) ? new GroupSalaryColumnSpecification(
-                new SearchCriteria("name", ":", name)) : null;
-        GroupSalaryColumnSpecification codeSeach = (code != null && !code.isEmpty()) ? new GroupSalaryColumnSpecification(
-                new SearchCriteria("code", ":", code)) : null;
-
-        if (Objects.nonNull(name) || Objects.nonNull(code)) {
-            Page<GroupSalaryColumnsEntity> groupSalaryColumnsEntitiesSearch = groupSalaryColumnRepository
-                    .findAll(Specification.where(nameSearch).or(codeSeach), pageable);
-            groupSalaryColumnResponsePage = getListGroup(groupSalaryColumnsEntitiesSearch);
-        } else {
-            Page<GroupSalaryColumnsEntity> groupSalaryColumnsEntities = groupSalaryColumnRepository.findAll(pageable);
-            groupSalaryColumnResponsePage = getListGroup(groupSalaryColumnsEntities);
-        }
-
-        return groupSalaryColumnResponsePage;
+    public Page<GroupSalaryColumnResponse> getListGroupSalaryResponse(Long id, String search, String name, Pageable pageable) {
+        Page<GroupSalaryColumnsEntity> groupSalaryColumnsEntities = getGroupColumnSalaryEntitySearch(id,search,name,pageable);
+        return getListGroup(groupSalaryColumnsEntities);
     }
 
     @Override
@@ -73,6 +61,17 @@ public class GroupSalaryColumnService implements GroupSalaryColumnsApi {
         groupSalaryColumnRepository.save(groupSalaryColumnsEntity);
     }
 
+    Page<GroupSalaryColumnsEntity> getGroupColumnSalaryEntitySearch(
+            Long id,
+            String search,
+            String name,
+            Pageable pageable){
+        Specification<GroupSalaryColumnsEntity> conditions = Specification.where(GroupSalaryColumnSpecification.filterById(id));
+        conditions = conditions.and(GroupSalaryColumnSpecification.filterNameOrCode(search));
+        conditions = conditions.and(GroupSalaryColumnSpecification.filterName(name));
+
+        return groupSalaryColumnRepository.findAll(conditions, pageable);
+    }
     @Override
     @Transactional
     public void deleteGroupColumnSalary(Long groupId) {

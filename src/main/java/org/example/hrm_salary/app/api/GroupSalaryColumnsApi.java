@@ -14,13 +14,15 @@ import javax.validation.Valid;
 public interface GroupSalaryColumnsApi {
     @PostMapping("/create")
     @Operation(summary = "Create new group salary column type ")
-    void createGroupColumnsType( @Valid @RequestBody GroupSalaryColumnsCreateRequest groupSalaryColumnsCreateRequest);
+    void createGroupColumnsType(@Valid @RequestBody GroupSalaryColumnsCreateRequest groupSalaryColumnsCreateRequest);
 
     @GetMapping("/list")
     @Operation(summary = "Get list group salary column type ")
-    Page<GroupSalaryColumnResponse> getListGroupSalaryResponse(@RequestParam(required = false) String name,
-                                                               @RequestParam(required = false) String code,
-                                                               @ParameterObject Pageable pageable);
+    Page<GroupSalaryColumnResponse> getListGroupSalaryResponse(
+            @RequestParam(required = false) Long id,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String name,
+            @ParameterObject Pageable pageable);
 
     @PutMapping("/update")
     @Operation(summary = "Update group column type")
