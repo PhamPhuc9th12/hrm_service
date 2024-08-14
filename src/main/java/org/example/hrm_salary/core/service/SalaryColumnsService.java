@@ -13,6 +13,7 @@ import org.example.hrm_salary.core.port.mapper.SalaryColumnsMapper;
 import org.example.hrm_salary.core.port.repository.CustomRepository;
 import org.example.hrm_salary.core.port.repository.GroupSalaryColumnRepository;
 import org.example.hrm_salary.core.port.repository.SalaryColumnsRepository;
+import org.example.hrm_salary.core.port.repository.SalaryTemplatesSalaryColumnsRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class SalaryColumnsService implements SalaryColumnApi {
     private final SalaryColumnsRepository salaryColumnsRepository;
     private final SalaryColumnsMapper salaryColumnsMapper;
     private final GroupSalaryColumnRepository groupSalaryColumnRepository;
+    private final SalaryTemplatesSalaryColumnsRepository salaryTemplatesSalaryColumnsRepository;
 
     @Transactional
     @Override
@@ -98,6 +100,7 @@ public class SalaryColumnsService implements SalaryColumnApi {
     @Transactional
     public void deleteSalaryColumn(Long salaryColumnId) {
         SalaryColumnsEntity salaryColumnsEntity = customRepository.getSalaryColumnEntityById(salaryColumnId);
+        salaryTemplatesSalaryColumnsRepository.deleteAllBySalaryColumnsId(salaryColumnId);
         salaryColumnsRepository.delete(salaryColumnsEntity);
     }
 

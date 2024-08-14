@@ -11,6 +11,7 @@ import org.example.hrm_salary.core.domain.entity.GroupSalaryColumnsEntity;
 import org.example.hrm_salary.core.port.mapper.GroupSalaryColumnMapper;
 import org.example.hrm_salary.core.port.repository.GroupSalaryColumnRepository;
 import org.example.hrm_salary.core.domain.specification.GroupSalaryColumnSpecification;
+import org.example.hrm_salary.core.port.repository.SalaryTemplatesSalaryColumnsRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -25,6 +26,7 @@ import java.util.Objects;
 public class GroupSalaryColumnService implements GroupSalaryColumnsApi {
     private final GroupSalaryColumnMapper groupSalaryColumnMapper;
     private final GroupSalaryColumnRepository groupSalaryColumnRepository;
+    private final SalaryTemplatesSalaryColumnsRepository salaryTemplatesSalaryColumnsRepository;
 
     @Override
     @Transactional
@@ -73,11 +75,12 @@ public class GroupSalaryColumnService implements GroupSalaryColumnsApi {
 
     @Override
     @Transactional
-    public void deleteGroupColumnSalary(Long columnId) {
-        groupSalaryColumnRepository.findById(columnId).orElseThrow(
+    public void deleteGroupColumnSalary(Long groupId) {
+        groupSalaryColumnRepository.findById(groupId).orElseThrow(
                 () -> new RuntimeException(ErrorCode.NOT_FOUND)
         );
-        groupSalaryColumnRepository.deleteById(columnId);
+        salaryTemplatesSalaryColumnsRepository.deleteAllByGroupSalaryColumnsId(groupId);
+        groupSalaryColumnRepository.deleteById(groupId);
     }
 
     @Override
