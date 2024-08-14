@@ -15,6 +15,8 @@ import org.example.hrm_salary.core.domain.constant.IdAndName;
 import org.example.hrm_salary.core.domain.constant.IdResponse;
 import org.example.hrm_salary.core.domain.entity.*;
 import org.example.hrm_salary.core.domain.enums.ApplicablesType;
+import org.example.hrm_salary.core.domain.specification.SpecificationSalaryColumn;
+import org.example.hrm_salary.core.domain.specification.SpecificationSalaryTemplate;
 import org.example.hrm_salary.core.port.mapper.GroupSalaryColumnMapper;
 import org.example.hrm_salary.core.port.mapper.SalaryColumnsMapper;
 import org.example.hrm_salary.core.port.mapper.SalaryTemplateMapper;
@@ -23,6 +25,7 @@ import org.example.hrm_salary.core.port.repository.*;
 import org.example.hrm_salary.app.dto.response.employee.DataEmployeeResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,8 +50,8 @@ public class SalaryTemplateService implements SalaryTemplateApi {
     private final ServiceProxy serviceProxyImpl;
 
     @Override
-    public Page<SalaryTemplateResponse> getSalaryTemplatePage(Pageable pageable) {
-        Page<SalaryTemplatesEntity> salaryTemplatesEntities = salaryTemplateRepository.findAll(pageable);
+    public Page<SalaryTemplateResponse> getSalaryTemplatePage(Long id, String search, String name,Pageable pageable) {
+        Page<SalaryTemplatesEntity> salaryTemplatesEntities = getSalaryTemplateEntitySearch(id,search,name,pageable);
         if (salaryTemplatesEntities.isEmpty()) throw new RuntimeException(ErrorCode.LIST_IS_EMPTY);
         List<Long> templateIds = salaryTemplatesEntities.stream().map(SalaryTemplatesEntity::getId)
                 .collect(Collectors.toList());
@@ -69,7 +72,6 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
     }
-
     @Override
     public SalaryTemplateDetailResponse getSalaryTemplateById(Long templateId) {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
@@ -197,7 +199,17 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                         )
                 ));
     }
+    Page<SalaryTemplatesEntity> getSalaryTemplateEntitySearch(
+            Long id,
+            String search,
+            String name,
+            Pageable pageable){
+        Specification<SalaryTemplatesEntity> conditions = Specification.where(SpecificationSalaryTemplate.filterById(id));
+        conditions = conditions.and(SpecificationSalaryTemplate.filterNameOrCode(search));
+        conditions = conditions.and(SpecificationSalaryTemplate.filterName(name));
 
+        return salaryTemplateRepository.findAll(conditions, pageable);
+    }
     private SalaryTemplateDetailResponse getSalaryTemplateInformationById(Long templateId
             , List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities
             , SalaryTemplateDetailResponse salaryTemplateResponse) {

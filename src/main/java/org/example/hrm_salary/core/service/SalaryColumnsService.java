@@ -9,6 +9,7 @@ import org.example.hrm_salary.core.domain.constant.IdAndName;
 import org.example.hrm_salary.core.domain.constant.IdResponse;
 import org.example.hrm_salary.core.domain.entity.GroupSalaryColumnsEntity;
 import org.example.hrm_salary.core.domain.entity.SalaryColumnsEntity;
+import org.example.hrm_salary.core.domain.specification.SpecificationSalaryColumn;
 import org.example.hrm_salary.core.port.mapper.SalaryColumnsMapper;
 import org.example.hrm_salary.core.port.repository.CustomRepository;
 import org.example.hrm_salary.core.port.repository.GroupSalaryColumnRepository;
@@ -16,12 +17,12 @@ import org.example.hrm_salary.core.port.repository.SalaryColumnsRepository;
 import org.example.hrm_salary.core.port.repository.SalaryTemplatesSalaryColumnsRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 
@@ -60,8 +61,9 @@ public class SalaryColumnsService implements SalaryColumnApi {
     }
 
     @Override
-    public Page<SalaryColumnsResponse> getSalaryColumns(Pageable pageable) {
-        Page<SalaryColumnsEntity> salaryColumnsEntities = salaryColumnsRepository.findAll(pageable);
+    public Page<SalaryColumnsResponse> getSalaryColumns(Long id, String search, String name, Pageable pageable) {
+//        Page<SalaryColumnsEntity> salaryColumnsEntities = salaryColumnsRepository.findAll(pageable);
+        Page<SalaryColumnsEntity> salaryColumnsEntities = getSalaryColumnEntitySearch(id,search,name,pageable);
         if (salaryColumnsEntities.isEmpty()) throw new RuntimeException(ErrorCode.NOT_FOUND);
         List<Long> groupIds = salaryColumnsEntities.stream().map(SalaryColumnsEntity::getGroupSalaryColumnsId)
                 .collect(Collectors.toList());
@@ -78,6 +80,17 @@ public class SalaryColumnsService implements SalaryColumnApi {
                     return salaryColumnsResponse;
                 }
         );
+    }
+    Page<SalaryColumnsEntity> getSalaryColumnEntitySearch(
+            Long id,
+            String search,
+            String name,
+            Pageable pageable){
+        Specification<SalaryColumnsEntity> conditions = Specification.where(SpecificationSalaryColumn.filterById(id));
+        conditions = conditions.and(SpecificationSalaryColumn.filterNameOrCode(search));
+        conditions = conditions.and(SpecificationSalaryColumn.filterName(name));
+
+        return salaryColumnsRepository.findAll(conditions, pageable);
     }
 
     @Override

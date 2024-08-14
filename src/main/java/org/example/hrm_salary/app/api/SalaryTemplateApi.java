@@ -19,7 +19,11 @@ import javax.validation.Valid;
 public interface SalaryTemplateApi {
     @GetMapping("/list")
     @Operation(summary = "Get list SalaryTemplate ")
-    Page<SalaryTemplateResponse> getSalaryTemplatePage( @ParameterObject  Pageable pageable);
+    Page<SalaryTemplateResponse> getSalaryTemplatePage(
+            @RequestParam(required = false) Long id,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String name,
+            @ParameterObject  Pageable pageable);
 
 
     @GetMapping("/detail")

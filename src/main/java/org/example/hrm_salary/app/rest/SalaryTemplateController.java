@@ -22,8 +22,8 @@ public class SalaryTemplateController implements SalaryTemplateApi {
         return salaryTemplateService.getSalaryTemplateById(templateId);
     }
     @Override
-    public Page<SalaryTemplateResponse> getSalaryTemplatePage(Pageable pageable) {
-        return salaryTemplateService.getSalaryTemplatePage(pageable);
+    public Page<SalaryTemplateResponse> getSalaryTemplatePage(Long id, String search, String name,Pageable pageable) {
+        return salaryTemplateService.getSalaryTemplatePage(id,search,name,pageable);
     }
 
     @Override

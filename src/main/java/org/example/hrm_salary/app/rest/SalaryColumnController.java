@@ -27,8 +27,8 @@ public class SalaryColumnController implements SalaryColumnApi {
     }
 
     @Override
-    public Page<SalaryColumnsResponse> getSalaryColumns(Pageable pageable) {
-        return salaryColumnService.getSalaryColumns(pageable);
+    public Page<SalaryColumnsResponse> getSalaryColumns(Long id, String search, String name,Pageable pageable) {
+        return salaryColumnService.getSalaryColumns(id,search,name,pageable);
     }
 
     @Override

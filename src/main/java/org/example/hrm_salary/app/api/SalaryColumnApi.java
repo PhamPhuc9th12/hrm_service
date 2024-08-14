@@ -26,15 +26,21 @@ public interface SalaryColumnApi {
             @RequestBody @Valid SalaryColumnRequest salaryColumnRequest);
 
 
-    @PostMapping("/list")
+    @GetMapping("/list")
     @Operation(summary = "get list salary columns ")
-    Page<SalaryColumnsResponse> getSalaryColumns(@ParameterObject Pageable pageable);
+    Page<SalaryColumnsResponse> getSalaryColumns(
+            @RequestParam(required = false) Long id,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String name,
+            @ParameterObject Pageable pageable);
 
-    SalaryColumnsResponse getSalaryColumnsById(Long salaryColumnId);
+    @GetMapping("/column-id")
+    @Operation(summary = "Get ColumnSalary by Id")
+    SalaryColumnsResponse getSalaryColumnsById(@RequestParam Long salaryColumnId);
 
     @PostMapping("/delete")
     @Operation(summary = "delete salary columns ")
-    void deleteSalaryColumn(Long salaryColumnId);
+    void deleteSalaryColumn(@RequestParam Long salaryColumnId);
 
     @GetMapping("/list-by-group")
     @Operation(summary = "Get list ColumnSalary by GroupColumnSalary Id")
