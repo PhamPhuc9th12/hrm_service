@@ -11,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+
 @RestController
 @RequestMapping("/api/v1/salary-template")
 @AllArgsConstructor
@@ -24,6 +26,11 @@ public class SalaryTemplateController implements SalaryTemplateApi {
     @Override
     public Page<SalaryTemplateResponse> getSalaryTemplatePage(Long id, String search, String name,Pageable pageable) {
         return salaryTemplateService.getSalaryTemplatePage(id,search,name,pageable);
+    }
+
+    @Override
+    public void exportSalaryTemplateExcel(Long templateId)  {
+        salaryTemplateService.exportSalaryTemplateExcel(templateId);
     }
 
     @Override

@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.validation.Valid;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 
 public interface SalaryTemplateApi {
     @GetMapping("/list")
@@ -25,6 +27,8 @@ public interface SalaryTemplateApi {
             @RequestParam(required = false) String name,
             @ParameterObject  Pageable pageable);
 
+    @PostMapping("/export")
+    void exportSalaryTemplateExcel(@RequestParam Long templateId) ;
 
     @GetMapping("/detail")
     @Operation(summary = "Get detail SalaryTemplate ")

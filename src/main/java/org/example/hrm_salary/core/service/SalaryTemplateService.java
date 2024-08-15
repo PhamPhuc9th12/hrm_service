@@ -1,6 +1,11 @@
 package org.example.hrm_salary.core.service;
 
 import lombok.AllArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.RegionUtil;
+import org.apache.poi.xssf.usermodel.XSSFFont;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.example.hrm_salary.app.api.SalaryTemplateApi;
 import org.example.hrm_salary.app.dto.request.SalarayColumnRequest.SalaryColumnBasicRequest;
 import org.example.hrm_salary.app.dto.request.SalaryTemplateRequest.SalaryTemplateRequest;
@@ -15,7 +20,6 @@ import org.example.hrm_salary.core.domain.constant.IdAndName;
 import org.example.hrm_salary.core.domain.constant.IdResponse;
 import org.example.hrm_salary.core.domain.entity.*;
 import org.example.hrm_salary.core.domain.enums.ApplicablesType;
-import org.example.hrm_salary.core.domain.specification.SpecificationSalaryColumn;
 import org.example.hrm_salary.core.domain.specification.SpecificationSalaryTemplate;
 import org.example.hrm_salary.core.port.mapper.GroupSalaryColumnMapper;
 import org.example.hrm_salary.core.port.mapper.SalaryColumnsMapper;
@@ -29,8 +33,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -73,6 +79,154 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         );
     }
 
+    private void setDataExcelEmployee(Long templateId, CellStyle dataStyle, Sheet sheet) {
+        List<Long> columnIds = salaryTemplatesSalaryColumnsRepository
+                .findAllBySalaryTemplatesId(templateId).stream()
+                .map(SalaryTemplatesSalaryColumnsEntity::getSalaryColumnsId).collect(Collectors.toList());
+        List<DataEmployeeResponse> dataEmployeeResponses = getEmployeesExport(templateId);
+        for (int i = 0; i < dataEmployeeResponses.size(); i++) {
+            Row dataRow = sheet.createRow(i + 2);
+            Cell sttCell = dataRow.createCell(0);
+            sttCell.setCellValue(i + 3);
+            sttCell.setCellStyle(dataStyle);
+            Cell codeCell = dataRow.createCell(1);
+            codeCell.setCellValue(dataEmployeeResponses.get(i).getCode());
+            codeCell.setCellStyle(dataStyle);
+            Cell nameCell = dataRow.createCell(2);
+            nameCell.setCellValue(dataEmployeeResponses.get(i).getFirstName() + " " + dataEmployeeResponses.get(i).getLastName());
+            nameCell.setCellStyle(dataStyle);
+            Cell positionCell = dataRow.createCell(3);
+            positionCell.setCellValue(dataEmployeeResponses.get(i).getPosition().getName());
+            positionCell.setCellStyle(dataStyle);
+            Cell salaryBasicCell = dataRow.createCell(4);
+            salaryBasicCell.setCellValue(5000000);
+            salaryBasicCell.setCellStyle(dataStyle);
+            for (int j = 0; j < columnIds.size(); j++) {
+                Cell itemCell = dataRow.createCell(j + 5);
+                itemCell.setCellValue(200000);
+                itemCell.setCellStyle(dataStyle);
+            }
+        }
+    }
+
+    private void createHeaderDefault(Sheet sheet, Row headerRow, CellStyle headerStyle) {
+        for (int i = 0; i < 5; i++) {
+            CellRangeAddress mergedRegion = new CellRangeAddress(0, 1, i, i);
+            sheet.addMergedRegion(mergedRegion);
+            RegionUtil.setBorderTop(BorderStyle.THIN, mergedRegion, sheet);
+            RegionUtil.setBorderBottom(BorderStyle.THIN, mergedRegion, sheet);
+            RegionUtil.setBorderLeft(BorderStyle.THIN, mergedRegion, sheet);
+            RegionUtil.setBorderRight(BorderStyle.THIN, mergedRegion, sheet);
+
+        }
+        String[] headers = {"STT", "Mã NV", "Tên nhân viên", "Chức vụ", "Mức lương cơ bản"};
+        for (int i = 0; i < 5; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
+        for (int i = 0; i < 5; i++) {
+            sheet.setColumnWidth(i, 5000);
+        }
+    }
+
+    private void createHeaderTemplateLines(Long templateId, Map<String, List<Long>> salaryTemplateMap
+            , Sheet sheet, Row headerRow, CellStyle headerStyle) {
+        List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities = salaryTemplatesSalaryColumnsRepository
+                .findAllBySalaryTemplatesId(templateId);
+        // lay ra groupId cua cac templateLine co group
+        List<Long> groupIds = new ArrayList<>();
+        salaryTemplatesSalaryColumnsEntities.forEach(
+                salaryTemplatesSalaryColumnsEntity -> {
+                    if (Objects.nonNull(salaryTemplatesSalaryColumnsEntity.getGroupSalaryColumnsId())) {
+                        groupIds.add(salaryTemplatesSalaryColumnsEntity.getGroupSalaryColumnsId());
+                    }
+                }
+        );
+        // lay ra tat ca cac columnId theo templateId
+        List<Long> columnIds = salaryTemplatesSalaryColumnsEntities.stream().map(
+                SalaryTemplatesSalaryColumnsEntity::getSalaryColumnsId
+        ).collect(Collectors.toList());
+        Map<Long, GroupSalaryColumnsEntity> groupSalaryColumnsEntityMap = customRepository.getGroupSalaryColumnsEntityMap(groupIds);
+        Map<Long, SalaryColumnsEntity> salaryColumnsEntityMap = customRepository.getSalaryColumnsEntityMap(columnIds);
+        Set<Long> columnIdsSet = new HashSet<>(columnIds);
+        Row headerItemRow = sheet.createRow(1);
+        Map<Long, List<SalaryColumnBasicResponse>> salaryColumnBasicResponseMap = getSalaryColumnBasicMap(salaryTemplatesSalaryColumnsEntities, columnIdsSet);
+        salaryTemplateMap.forEach(
+                (key, templateItem) -> {
+                    if (templateItem.size() != 1) {
+                        Long startIndex = templateItem.get(0);
+                        Long endIndex = templateItem.get(templateItem.size() - 1);
+                        CellRangeAddress mergedRegion = new CellRangeAddress(0, 0,
+                                Math.toIntExact(startIndex) + 4, Math.toIntExact(endIndex) + 4);
+                        sheet.addMergedRegion(mergedRegion);
+                        Cell groupCell = headerRow.createCell(Math.toIntExact(startIndex) + 4);
+                        Long idGroup = Long.parseLong(key.substring(1).trim());
+                        groupCell.setCellValue(
+                                groupSalaryColumnsEntityMap.get(idGroup)
+                                        .getName()
+                        );
+                        groupCell.setCellStyle(headerStyle);
+                        sheet.setColumnWidth(Math.toIntExact(startIndex) + 4, 5000 * templateItem.size());
+                        //set Item column for groupTemplate
+                        Long idColumn = Long.parseLong(key.substring(1).trim());
+                        List<SalaryColumnBasicResponse> salaryColumnBasicResponses = salaryColumnBasicResponseMap.get(idColumn);
+                        for (int i = 0; i < templateItem.size(); i++) {
+                            Cell cellItem = headerItemRow.createCell(Math.toIntExact(templateItem.get(i)) + 4);
+                            sheet.setColumnWidth(Math.toIntExact(templateItem.get(i)) + 4, 5000);
+                            cellItem.setCellValue(
+                                    salaryColumnBasicResponses.get(i).getName()
+                            );
+                            cellItem.setCellStyle(headerStyle);
+                        }
+                    } else {
+                        Long index = templateItem.get(0);
+                        CellRangeAddress mergedRegion = new CellRangeAddress(0, 1,
+                                Math.toIntExact(index) + 4, Math.toIntExact(index) + 4);
+                        sheet.addMergedRegion(mergedRegion);
+                        Cell columnItemCell = headerRow.createCell(Math.toIntExact(index) + 4);
+                        sheet.setColumnWidth(Math.toIntExact(Math.toIntExact(index)) + 4, 6000);
+                        Long idColumn = Long.parseLong(key.substring(1).trim());
+                        columnItemCell.setCellValue(
+                                salaryColumnsEntityMap.get(idColumn)
+                                        .getName()
+                        );
+                        columnItemCell.setCellStyle(headerStyle);
+                        RegionUtil.setBorderTop(BorderStyle.THIN, mergedRegion, sheet);
+                        RegionUtil.setBorderBottom(BorderStyle.THIN, mergedRegion, sheet);
+                        RegionUtil.setBorderLeft(BorderStyle.THIN, mergedRegion, sheet);
+                        RegionUtil.setBorderRight(BorderStyle.THIN, mergedRegion, sheet);
+                    }
+                }
+        );
+    }
+
+    @Override
+    public void exportSalaryTemplateExcel(Long templateId)  {
+        List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
+                salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesId(templateId);
+        Map<String, List<Long>> indexTemplateLineMap = getStartEndIndex(salaryTemplatesSalaryColumnsEntities);
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet();
+
+        CellStyle headerStyle = createHeaderStyle(workbook);
+        CellStyle dataStyle = createDataStyle(workbook);
+
+        Row headerRow = sheet.createRow(0);
+        //create header default for empployee
+        createHeaderDefault(sheet, headerRow, headerStyle);
+        //create header for TemplateItemLines
+        createHeaderTemplateLines(templateId, indexTemplateLineMap, sheet, headerRow, headerStyle);
+        //create Data for TemplateItemLines
+        setDataExcelEmployee(templateId, dataStyle, sheet);
+        try (FileOutputStream out = new FileOutputStream("D:\\SalaryTemplateReport.xlsx")) {
+            workbook.write(out);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
     @Override
     public SalaryTemplateDetailResponse getSalaryTemplateById(Long templateId) {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
@@ -90,7 +244,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         SalaryTemplatesEntity salaryTemplatesEntity = salaryTemplateMapper.getEntityFromRequest(salaryTemplateRequest);
         salaryTemplateRepository.save(salaryTemplatesEntity);
         // create salary
-        createTemplateLines(salaryTemplateRequest,salaryTemplatesEntity);
+        createTemplateLines(salaryTemplateRequest, salaryTemplatesEntity);
         createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
         return IdResponse.builder()
                 .id(salaryTemplatesEntity.getId())
@@ -111,7 +265,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(salaryTemplateId);
         salaryTemplateMapper.updateSalaryTemplate(salaryTemplatesEntity, salaryTemplateRequest);
         salaryTemplateRepository.save(salaryTemplatesEntity);
-        createTemplateLines(salaryTemplateRequest,salaryTemplatesEntity);
+        createTemplateLines(salaryTemplateRequest, salaryTemplatesEntity);
         createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
 
         return IdResponse.builder()
@@ -119,8 +273,18 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 .build();
     }
 
+    private List<DataEmployeeResponse> getEmployeesExport(Long templateId) {
+        SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
+        if (salaryTemplatesEntity.getApplicableType().equals(ApplicablesType.ALL)) {
+            Map<Long, DataEmployeeResponse> dataEmployeeResponsesMap = serviceProxyImpl.getAllEmployeeMap();
+            return new ArrayList<>(dataEmployeeResponsesMap.values());
+        }
+        Map<Long, List<DataEmployeeResponse>> employeeFromResourceMap = getEmployeeFromResourceMap(templateId);
+        return employeeFromResourceMap.get(templateId);
+    }
+
     private void createTemplateLines(SalaryTemplateRequest salaryTemplateRequest,
-                                     SalaryTemplatesEntity salaryTemplatesEntity){
+                                     SalaryTemplatesEntity salaryTemplatesEntity) {
         salaryTemplateApplicableRepository.deleteAllBySalaryTemplatesId(salaryTemplatesEntity.getId());
         salaryTemplatesSalaryColumnsRepository.deleteAllBySalaryTemplatesId(salaryTemplatesEntity.getId());
         if (Objects.isNull(salaryTemplateRequest.getTemplatesLineItems())) {
@@ -228,7 +392,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
         Map<Long, List<SalaryColumnBasicResponse>> salaryColumnBasicMap =
-                groupIdSalaryColumnBasicMap(salaryTemplatesSalaryColumnsEntities, columnItemIds);
+                getSalaryColumnBasicMap(salaryTemplatesSalaryColumnsEntities, columnItemIds);
         Map<Long, SalaryColumnBasicResponse> salaryColumnsBasicMap = salaryColumnsRepository.findAllByIdIn(columnIds)
                 .stream().collect(Collectors.toMap(SalaryColumnsEntity::getId, salaryColumnsEntity ->
                         salaryColumnsMapper.getSalaryColumnBasicResponseFromEntity(salaryColumnsEntity)));
@@ -267,7 +431,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         return salaryTemplateResponse;
     }
 
-    private Map<Long, List<SalaryColumnBasicResponse>> groupIdSalaryColumnBasicMap(
+    private Map<Long, List<SalaryColumnBasicResponse>> getSalaryColumnBasicMap(
             List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities,
             Set<Long> columnIds) {
         List<Long> columnIdList = new ArrayList<>(columnIds);
@@ -311,4 +475,59 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         )) throw new RuntimeException(ErrorCode.SAME_RECORD);
     }
 
+    private Map<String, List<Long>> getStartEndIndex(List<SalaryTemplatesSalaryColumnsEntity> columnRecords) {
+        Map<String, List<Long>> indexGroupMap = new LinkedHashMap<>();
+        Set<String> checkContain = new HashSet<>();
+        Long index = 0L;
+        for (SalaryTemplatesSalaryColumnsEntity record : columnRecords) {
+            index++;
+            if (Objects.nonNull(record.getGroupSalaryColumnsId())) {
+                if (!checkContain.contains("G" + record.getGroupSalaryColumnsId())) {
+                    indexGroupMap.put("G" + record.getGroupSalaryColumnsId(), new ArrayList<>());
+                    checkContain.add("G" + record.getGroupSalaryColumnsId());
+                }
+                indexGroupMap.get("G" + record.getGroupSalaryColumnsId()).add(index);
+            } else {
+                indexGroupMap.put("C" + record.getSalaryColumnsId(), Collections.singletonList(index));
+            }
+        }
+        return indexGroupMap;
+    }
+
+    private CellStyle createHeaderStyle(Workbook workbook) {
+        CellStyle headerStyle = workbook.createCellStyle();
+        headerStyle.setAlignment(HorizontalAlignment.CENTER);
+        headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        Font headerFont = workbook.createFont();
+        XSSFFont font = ((XSSFWorkbook) workbook).createFont();
+        font.setFontName("Arial");
+        font.setFontHeightInPoints((short) 16);
+        font.setBold(true);
+        headerStyle.setFont(font);
+        headerStyle.setFont(headerFont);
+        //set color
+        headerStyle.setFillForegroundColor(IndexedColors.SKY_BLUE.getIndex());
+        headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        // setBorder
+        headerStyle.setBorderTop(BorderStyle.THIN);
+        headerStyle.setBorderBottom(BorderStyle.THIN);
+        headerStyle.setBorderLeft(BorderStyle.THIN);
+        headerStyle.setBorderRight(BorderStyle.THIN);
+        headerStyle.setTopBorderColor(IndexedColors.BLACK.getIndex());
+        headerStyle.setBottomBorderColor(IndexedColors.BLACK.getIndex());
+        headerStyle.setLeftBorderColor(IndexedColors.BLACK.getIndex());
+        headerStyle.setRightBorderColor(IndexedColors.BLACK.getIndex());
+        return headerStyle;
+    }
+
+    private CellStyle createDataStyle(Workbook workbook) {
+        CellStyle dataStyle = workbook.createCellStyle();
+        dataStyle.setAlignment(HorizontalAlignment.CENTER);
+        dataStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        dataStyle.setBorderBottom(BorderStyle.THIN);
+        dataStyle.setBorderLeft(BorderStyle.THIN);
+        dataStyle.setBorderTop(BorderStyle.THIN);
+        dataStyle.setBorderRight(BorderStyle.THIN);
+        return dataStyle;
+    }
 }

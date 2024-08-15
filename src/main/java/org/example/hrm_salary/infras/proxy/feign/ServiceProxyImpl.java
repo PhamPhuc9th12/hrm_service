@@ -6,6 +6,7 @@ import org.example.hrm_salary.app.dto.response.department.DepartmentResponse;
 import org.example.hrm_salary.app.dto.response.department.FormatDepartmentContent;
 import org.example.hrm_salary.app.dto.response.employee.DataEmployeeResponse;
 import org.example.hrm_salary.app.dto.response.employee.EmployeeResponse;
+import org.example.hrm_salary.app.dto.response.employee.FormatEmployeeContent;
 import org.example.hrm_salary.core.domain.constant.ErrorCode;
 import org.example.hrm_salary.core.port.proxy.ServiceProxy;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,17 @@ public class ServiceProxyImpl implements ServiceProxy {
                 .collect(Collectors.toMap(
                 DataEmployeeResponse::getId, Function.identity()
         ));
+    }
+
+    @Override
+    public Map<Long, DataEmployeeResponse> getAllEmployeeMap() {
+        FormatEmployeeContent employeeResponses = serviceClient.getAllEmployee();
+        if(Objects.isNull(employeeResponses)) throw new RuntimeException(ErrorCode.LIST_IS_EMPTY);
+        return  employeeResponses.getData().getContent().stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(
+                        DataEmployeeResponse::getId, Function.identity()
+                ));
     }
 
     @Override

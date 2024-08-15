@@ -10,7 +10,9 @@ import java.util.Map;
 
 public interface ServiceProxy {
 
-    public Map<Long, DataEmployeeResponse> getEmployeesByListIdsMap(List<Long> employeeIds);
+     Map<Long, DataEmployeeResponse> getEmployeesByListIdsMap(List<Long> employeeIds);
+    Map<Long, DataEmployeeResponse> getAllEmployeeMap();
 
-    public Map<Long, DataDepartmentResponse> getDepartmentsByListIdsMap(List<Long> departmentIds);
+
+     Map<Long, DataDepartmentResponse> getDepartmentsByListIdsMap(List<Long> departmentIds);
 }
