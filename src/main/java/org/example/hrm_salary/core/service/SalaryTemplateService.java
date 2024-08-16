@@ -78,6 +78,75 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
     }
+    @Override
+    public SalaryTemplateDetailResponse getSalaryTemplateById(Long templateId) {
+        SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
+        SalaryTemplateDetailResponse salaryTemplateResponse = salaryTemplateMapper
+                .getResponseDetailFromEntity(salaryTemplatesEntity);
+        List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
+                salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesId(templateId);
+        return getSalaryTemplate(templateId, salaryTemplatesSalaryColumnsEntities, salaryTemplateResponse);
+    }
+
+    @Override
+    @Transactional
+    public IdResponse createSalaryTemplate(SalaryTemplateRequest salaryTemplateRequest) {
+        checkExitRecord(salaryTemplateRequest);
+        SalaryTemplatesEntity salaryTemplatesEntity = salaryTemplateMapper.getEntityFromRequest(salaryTemplateRequest);
+        salaryTemplateRepository.save(salaryTemplatesEntity);
+        // create salary
+        createTemplateLines(salaryTemplateRequest, salaryTemplatesEntity);
+        createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
+        return IdResponse.builder()
+                .id(salaryTemplatesEntity.getId())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void deleteSalaryTemplate(Long salaryTemplateId) {
+        SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(salaryTemplateId);
+        salaryTemplateRepository.delete(salaryTemplatesEntity);
+    }
+
+    @Override
+    @Transactional
+    public IdResponse updateSalaryTemplate(Long salaryTemplateId, SalaryTemplateRequest salaryTemplateRequest) {
+        checkExitRecord(salaryTemplateRequest);
+        SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(salaryTemplateId);
+        salaryTemplateMapper.updateSalaryTemplate(salaryTemplatesEntity, salaryTemplateRequest);
+        salaryTemplateRepository.save(salaryTemplatesEntity);
+        createTemplateLines(salaryTemplateRequest, salaryTemplatesEntity);
+        createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
+
+        return IdResponse.builder()
+                .id(salaryTemplatesEntity.getId())
+                .build();
+    }
+    @Override
+    public void exportSalaryTemplateExcel(Long templateId)  {
+        List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
+                salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesId(templateId);
+        Map<String, List<Long>> indexTemplateLineMap = getStartEndIndex(salaryTemplatesSalaryColumnsEntities);
+        Workbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet();
+
+        CellStyle headerStyle = createHeaderStyle(workbook);
+        CellStyle dataStyle = createDataStyle(workbook);
+
+        Row headerRow = sheet.createRow(0);
+        //create header default for employee
+        createHeaderDefault(sheet, headerRow, headerStyle);
+        //create header for TemplateItemLines
+        createHeaderTemplateLines(templateId, indexTemplateLineMap, sheet, headerRow, headerStyle);
+        //create Data for TemplateItemLines
+        setDataExcelEmployee(templateId, dataStyle, sheet);
+        try (FileOutputStream out = new FileOutputStream("D:\\SalaryTemplateReport.xlsx")) {
+            workbook.write(out);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     private void setDataExcelEmployee(Long templateId, CellStyle dataStyle, Sheet sheet) {
         List<Long> columnIds = salaryTemplatesSalaryColumnsRepository
@@ -101,6 +170,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
             Cell salaryBasicCell = dataRow.createCell(4);
             salaryBasicCell.setCellValue(5000000);
             salaryBasicCell.setCellStyle(dataStyle);
+            // set Data column in group
             for (int j = 0; j < columnIds.size(); j++) {
                 Cell itemCell = dataRow.createCell(j + 5);
                 itemCell.setCellValue(200000);
@@ -130,7 +200,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         }
     }
 
-    private void createHeaderTemplateLines(Long templateId, Map<String, List<Long>> salaryTemplateMap
+    private void createHeaderTemplateLines(Long templateId, Map<String, List<Long>> indexTemplateLineMap
             , Sheet sheet, Row headerRow, CellStyle headerStyle) {
         List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities = salaryTemplatesSalaryColumnsRepository
                 .findAllBySalaryTemplatesId(templateId);
@@ -152,7 +222,8 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         Set<Long> columnIdsSet = new HashSet<>(columnIds);
         Row headerItemRow = sheet.createRow(1);
         Map<Long, List<SalaryColumnBasicResponse>> salaryColumnBasicResponseMap = getSalaryColumnBasicMap(salaryTemplatesSalaryColumnsEntities, columnIdsSet);
-        salaryTemplateMap.forEach(
+        // Lay ra thu tu cua cac templateLineItem: co 3 cot trong G2 va 1 cot rieng C2:[ G2-[1,2,3], C2-[4]]
+        indexTemplateLineMap.forEach(
                 (key, templateItem) -> {
                     if (templateItem.size() != 1) {
                         Long startIndex = templateItem.get(0);
@@ -200,79 +271,6 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
     }
-
-    @Override
-    public void exportSalaryTemplateExcel(Long templateId)  {
-        List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
-                salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesId(templateId);
-        Map<String, List<Long>> indexTemplateLineMap = getStartEndIndex(salaryTemplatesSalaryColumnsEntities);
-        Workbook workbook = new XSSFWorkbook();
-        Sheet sheet = workbook.createSheet();
-
-        CellStyle headerStyle = createHeaderStyle(workbook);
-        CellStyle dataStyle = createDataStyle(workbook);
-
-        Row headerRow = sheet.createRow(0);
-        //create header default for empployee
-        createHeaderDefault(sheet, headerRow, headerStyle);
-        //create header for TemplateItemLines
-        createHeaderTemplateLines(templateId, indexTemplateLineMap, sheet, headerRow, headerStyle);
-        //create Data for TemplateItemLines
-        setDataExcelEmployee(templateId, dataStyle, sheet);
-        try (FileOutputStream out = new FileOutputStream("D:\\SalaryTemplateReport.xlsx")) {
-            workbook.write(out);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-
-    @Override
-    public SalaryTemplateDetailResponse getSalaryTemplateById(Long templateId) {
-        SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
-        SalaryTemplateDetailResponse salaryTemplateResponse = salaryTemplateMapper
-                .getResponseDetailFromEntity(salaryTemplatesEntity);
-        List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
-                salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesId(templateId);
-        return getSalaryTemplate(templateId, salaryTemplatesSalaryColumnsEntities, salaryTemplateResponse);
-    }
-
-    @Override
-    @Transactional
-    public IdResponse createSalaryTemplate(SalaryTemplateRequest salaryTemplateRequest) {
-        checkExitRecord(salaryTemplateRequest);
-        SalaryTemplatesEntity salaryTemplatesEntity = salaryTemplateMapper.getEntityFromRequest(salaryTemplateRequest);
-        salaryTemplateRepository.save(salaryTemplatesEntity);
-        // create salary
-        createTemplateLines(salaryTemplateRequest, salaryTemplatesEntity);
-        createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
-        return IdResponse.builder()
-                .id(salaryTemplatesEntity.getId())
-                .build();
-    }
-
-    @Override
-    @Transactional
-    public void deleteSalaryTemplate(Long salaryTemplateId) {
-        SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(salaryTemplateId);
-        salaryTemplateRepository.delete(salaryTemplatesEntity);
-    }
-
-    @Override
-    @Transactional
-    public IdResponse updateSalaryTemplate(Long salaryTemplateId, SalaryTemplateRequest salaryTemplateRequest) {
-        checkExitRecord(salaryTemplateRequest);
-        SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(salaryTemplateId);
-        salaryTemplateMapper.updateSalaryTemplate(salaryTemplatesEntity, salaryTemplateRequest);
-        salaryTemplateRepository.save(salaryTemplatesEntity);
-        createTemplateLines(salaryTemplateRequest, salaryTemplatesEntity);
-        createTeamPlateApplicableType(salaryTemplateRequest, salaryTemplatesEntity);
-
-        return IdResponse.builder()
-                .id(salaryTemplatesEntity.getId())
-                .build();
-    }
-
     private List<DataEmployeeResponse> getEmployeesExport(Long templateId) {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
         if (salaryTemplatesEntity.getApplicableType().equals(ApplicablesType.ALL)) {
