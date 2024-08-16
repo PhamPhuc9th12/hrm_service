@@ -228,6 +228,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                     if (templateItem.size() != 1) {
                         Long startIndex = templateItem.get(0);
                         Long endIndex = templateItem.get(templateItem.size() - 1);
+                        // merge column in group
                         CellRangeAddress mergedRegion = new CellRangeAddress(0, 0,
                                 Math.toIntExact(startIndex) + 4, Math.toIntExact(endIndex) + 4);
                         sheet.addMergedRegion(mergedRegion);
@@ -252,6 +253,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                         }
                     } else {
                         Long index = templateItem.get(0);
+                        // merge row A1 A2 of column rieng le
                         CellRangeAddress mergedRegion = new CellRangeAddress(0, 1,
                                 Math.toIntExact(index) + 4, Math.toIntExact(index) + 4);
                         sheet.addMergedRegion(mergedRegion);
