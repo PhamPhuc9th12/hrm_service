@@ -28,7 +28,7 @@ public interface SalaryTemplateApi {
             @ParameterObject  Pageable pageable);
 
     @PostMapping("/export")
-    void exportSalaryTemplateExcel(@RequestParam Long templateId) ;
+    IdResponse exportSalaryTemplateExcel(@RequestParam Long templateId) ;
 
     @GetMapping("/detail")
     @Operation(summary = "Get detail SalaryTemplate ")

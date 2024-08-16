@@ -29,8 +29,8 @@ public class SalaryTemplateController implements SalaryTemplateApi {
     }
 
     @Override
-    public void exportSalaryTemplateExcel(Long templateId)  {
-        salaryTemplateService.exportSalaryTemplateExcel(templateId);
+    public IdResponse exportSalaryTemplateExcel(Long templateId)  {
+        return salaryTemplateService.exportSalaryTemplateExcel(templateId);
     }
 
     @Override

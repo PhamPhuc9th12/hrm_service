@@ -17,6 +17,7 @@ public interface SalaryTemplatesSalaryColumnsRepository extends JpaRepository<Sa
     void deleteAllBySalaryColumnsId(Long salaryColumnId);
     void deleteAllByGroupSalaryColumnsId(Long groupColumnId);
     List<SalaryTemplatesSalaryColumnsEntity> findAllBySalaryTemplatesId(Long salaryTemplateId);
+    List<SalaryTemplatesSalaryColumnsEntity> findAllBySalaryTemplatesIdOrderById(Long salaryTemplatesId);
 
     List<SalaryTemplatesSalaryColumnsEntity> findAllBySalaryTemplatesIdIn(Collection<Long> salaryTemplateIds);
 }

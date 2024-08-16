@@ -20,6 +20,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.validation.Valid;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 
@@ -32,7 +33,7 @@ public class GroupSalaryColumnService implements GroupSalaryColumnsApi {
 
     @Override
     @Transactional
-    public void createGroupColumnsType(GroupSalaryColumnsCreateRequest groupSalaryColumnsCreateRequest) {
+    public void createGroupColumnsType( GroupSalaryColumnsCreateRequest groupSalaryColumnsCreateRequest) {
         checkSameRecordCreate(groupSalaryColumnsCreateRequest.getName(), groupSalaryColumnsCreateRequest.getCode());
         GroupSalaryColumnsEntity groupSalaryColumnsEntity = groupSalaryColumnMapper
                 .getGroupSalaryColumnEntityBy(groupSalaryColumnsCreateRequest);

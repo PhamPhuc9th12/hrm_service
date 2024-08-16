@@ -124,9 +124,12 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 .build();
     }
     @Override
-    public void exportSalaryTemplateExcel(Long templateId)  {
+    public IdResponse exportSalaryTemplateExcel(Long templateId)  {
         List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
-                salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesId(templateId);
+                salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesIdOrderById(templateId);
+        if(Objects.isNull(salaryTemplatesSalaryColumnsEntities) || salaryTemplatesSalaryColumnsEntities.isEmpty())
+            throw new RuntimeException(ErrorCode.NOT_FOUND);
+
         Map<String, List<Long>> indexTemplateLineMap = getStartEndIndex(salaryTemplatesSalaryColumnsEntities);
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet();
@@ -146,6 +149,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+        return IdResponse.builder().id(templateId).build();
     }
 
     private void setDataExcelEmployee(Long templateId, CellStyle dataStyle, Sheet sheet) {
@@ -295,7 +299,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 throw new RuntimeException(ErrorCode.IS_NULL);
             if (Objects.nonNull(templatesLineRequest.getSalaryColumn()) && Objects.nonNull(templatesLineRequest.getGroupSalary()))
                 throw new RuntimeException(ErrorCode.IS_NULL);
-            // check column null-group not null
+            // check column null and group not null
             if (Objects.isNull(templatesLineRequest.getSalaryColumn())) {
                 List<SalaryColumnBasicRequest> groupSalaryItems = templatesLineRequest.getGroupSalaryItems();
                 // check groupLineItems null
