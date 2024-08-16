@@ -33,8 +33,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -78,6 +78,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
     }
+
     @Override
     public SalaryTemplateDetailResponse getSalaryTemplateById(Long templateId) {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
@@ -123,11 +124,12 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 .id(salaryTemplatesEntity.getId())
                 .build();
     }
+
     @Override
-    public IdResponse exportSalaryTemplateExcel(Long templateId)  {
+    public IdResponse exportSalaryTemplateExcel(Long templateId, HttpServletResponse response) throws IOException {
         List<SalaryTemplatesSalaryColumnsEntity> salaryTemplatesSalaryColumnsEntities =
                 salaryTemplatesSalaryColumnsRepository.findAllBySalaryTemplatesIdOrderById(templateId);
-        if(Objects.isNull(salaryTemplatesSalaryColumnsEntities) || salaryTemplatesSalaryColumnsEntities.isEmpty())
+        if (Objects.isNull(salaryTemplatesSalaryColumnsEntities) || salaryTemplatesSalaryColumnsEntities.isEmpty())
             throw new RuntimeException(ErrorCode.NOT_FOUND);
 
         Map<String, List<Long>> indexTemplateLineMap = getStartEndIndex(salaryTemplatesSalaryColumnsEntities);
@@ -144,11 +146,11 @@ public class SalaryTemplateService implements SalaryTemplateApi {
         createHeaderTemplateLines(templateId, indexTemplateLineMap, sheet, headerRow, headerStyle);
         //create Data for TemplateItemLines
         setDataExcelEmployee(templateId, dataStyle, sheet);
-        try (FileOutputStream out = new FileOutputStream("D:\\SalaryTemplateReport.xlsx")) {
-            workbook.write(out);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        ServletOutputStream ops = response.getOutputStream();
+        workbook.write(ops);
+        ops.close();
+        workbook.close();
+
         return IdResponse.builder().id(templateId).build();
     }
 
@@ -277,6 +279,7 @@ public class SalaryTemplateService implements SalaryTemplateApi {
                 }
         );
     }
+
     private List<DataEmployeeResponse> getEmployeesExport(Long templateId) {
         SalaryTemplatesEntity salaryTemplatesEntity = customRepository.getSalaryTemplateEntityById(templateId);
         if (salaryTemplatesEntity.getApplicableType().equals(ApplicablesType.ALL)) {

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -28,7 +29,7 @@ public interface SalaryTemplateApi {
             @ParameterObject  Pageable pageable);
 
     @PostMapping("/export")
-    IdResponse exportSalaryTemplateExcel(@RequestParam Long templateId) ;
+    IdResponse exportSalaryTemplateExcel(@RequestParam Long templateId, HttpServletResponse response) throws IOException;
 
     @GetMapping("/detail")
     @Operation(summary = "Get detail SalaryTemplate ")
@@ -46,4 +47,5 @@ public interface SalaryTemplateApi {
     @Operation(summary = "Update SalaryTemplate")
     IdResponse updateSalaryTemplate( @RequestParam Long salaryTemplateId,
                                      @RequestBody @Valid SalaryTemplateRequest salaryTemplateRequest);
+
 }
